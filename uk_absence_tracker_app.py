@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import json
 import gspread
 from datetime import datetime, timedelta
@@ -65,12 +63,44 @@ else:
     if "Planned" not in df:
         df["Planned"] = False
 
-# === Filter Options ===
+# === Calculations ===
+df = df.sort_values("Departure").reset_index(drop=True)
+df['Length'] = (df['Return'] - df['Departure']).dt.days - 1
+
+allowance = 180
+balances = []
+for i, row in df.iterrows():
+    allowance -= row['Length']
+    balances.append(allowance)
+df['Allowance'] = balances
+
+# === Restoration Dates ===
+restoration = []
+current_balance = df['Allowance'].iloc[-1]
+for row in df.itertuples():
+    date = row.Return + timedelta(days=365)
+    current_balance += row.Length
+    restoration.append({
+        "Date": date,
+        "Restored": row.Length,
+        "New Balance": current_balance,
+        "Reason": f"{row.Departure.date()} – {row.Return.date()}"
+    })
+restoration_df = pd.DataFrame(restoration).sort_values(by='Date').head(10)
+
+# === Show Tables First ===
+st.subheader("📋 Trip History")
+st.dataframe(df[['Departure', 'Return', 'Length', 'Planned', 'Allowance']])
+
+st.subheader("📈 Next 10 Balance Increase Dates")
+st.dataframe(restoration_df[['Date', 'Restored', 'New Balance', 'Reason']])
+
+# === Calendar Filter ===
 st.sidebar.subheader("📊 Calendar Filters")
 show_real = st.sidebar.checkbox("Show Real Trips", value=True)
 show_planned = st.sidebar.checkbox("Show Planned Trips", value=True)
 
-# === Generate Events for FullCalendar ===
+# === Generate Calendar Events ===
 events = []
 for i, row in df.iterrows():
     if pd.isnull(row['Departure']) or pd.isnull(row['Return']):
@@ -80,10 +110,10 @@ for i, row in df.iterrows():
         continue
     if not planned and not show_real:
         continue
-
     title = f"Trip {i+1}: {row['Departure'].date()} to {row['Return'].date()}"
     color = "#fd7e14" if planned else "#dc3545"
     events.append({
+        "id": str(i),
         "title": title,
         "start": row['Departure'].strftime("%Y-%m-%d"),
         "end": (row['Return'] + timedelta(days=1)).strftime("%Y-%m-%d"),
@@ -95,7 +125,7 @@ for i, row in df.iterrows():
         }
     })
 
-# === Render FullCalendar with Custom Popup ===
+# === FullCalendar with Popup, Edit/Delete, Animations ===
 st.subheader("📅 Interactive Calendar")
 fullcalendar_html = f"""
 <!DOCTYPE html>
@@ -104,20 +134,23 @@ fullcalendar_html = f"""
   <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
   <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
   <style>
-    #calendar {{ max-width: 900px; margin: 20px auto; }}
-    .fc-event-title-container:hover {{ cursor: pointer; }}
+    #calendar {{ max-width: 1000px; margin: 20px auto; }}
     #popup {{
       display: none;
       position: fixed;
       top: 20%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: white;
+      background: #fff;
       padding: 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
       z-index: 1000;
+      animation: fadeIn 0.4s ease-in-out;
     }}
-    #popup-close {{ cursor: pointer; color: red; float: right; }}
+    #popup-close {{ cursor: pointer; float: right; font-weight: bold; color: red; }}
+    @keyframes fadeIn {{ from {{opacity: 0;}} to {{opacity: 1;}} }}
+    button {{ margin-top: 10px; margin-right: 5px; }}
   </style>
   <script>
     document.addEventListener('DOMContentLoaded', function() {{
@@ -129,22 +162,24 @@ fullcalendar_html = f"""
         headerToolbar: {{
           left: 'prev,next today',
           center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          right: 'dayGridYear,dayGridMonth,timeGridWeek,timeGridDay'
+        }},
+        views: {{
+          dayGridYear: {{ type: 'dayGrid', duration: {{ months: 12 }} }}
         }},
         events: {json.dumps(events)},
         eventClick: function(info) {{
           var details = `<b>` + info.event.title + `</b><br>` +
                         `Type: ` + info.event.extendedProps.type + `<br>` +
-                        `Duration: ` + info.event.extendedProps.length;
+                        `Duration: ` + info.event.extendedProps.length + `<br><br>` +
+                        `<button onclick='alert("Edit feature coming soon!")'>✏️ Edit</button>` +
+                        `<button onclick='alert("Delete feature coming soon!")'>❌ Delete</button>`;
           popupContent.innerHTML = details;
           popup.style.display = 'block';
         }}
       }});
       calendar.render();
-
-      document.getElementById('popup-close').onclick = function() {{
-        popup.style.display = 'none';
-      }};
+      document.getElementById('popup-close').onclick = function() {{ popup.style.display = 'none'; }};
     }});
   </script>
 </head>
@@ -157,8 +192,4 @@ fullcalendar_html = f"""
 </body>
 </html>
 """
-components.html(fullcalendar_html, height=750, scrolling=True)
-
-# === Tables ===
-st.subheader("📋 Trip History")
-st.dataframe(df[['Departure', 'Return', 'Planned']])
+components.html(fullcalendar_html, height=800, scrolling=True)
