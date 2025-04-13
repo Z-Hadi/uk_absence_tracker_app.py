@@ -173,6 +173,26 @@ fig = px.timeline(
     color="Trip",
     hover_data=["Info"]
 )
+
+fig.update_layout(
+    showlegend=True,
+    xaxis_title="",
+    yaxis_title="",
+    height=500,
+    xaxis=dict(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ])
+        ),
+        rangeslider=dict(visible=True),
+        type="date"
+    )
+)
 fig.update_layout(showlegend=True, xaxis_title="", yaxis_title="", height=400)
 fig.update_yaxes(visible=True)
 st.plotly_chart(fig, use_container_width=True)
