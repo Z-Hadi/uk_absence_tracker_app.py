@@ -68,16 +68,15 @@ used_ranges = [pd.date_range(row.Departure + timedelta(days=1), row.Return - tim
 flat_abroad = pd.concat([pd.Series(x) for x in used_ranges], ignore_index=True)
 
 for day in all_dates:
-    in_abroad = (day in flat_abroad.values)
     days_abroad = (flat_abroad <= day).sum()
     remaining = max(180 - days_abroad, 0)
     daily_events.append({
-        "title": f"📉 {remaining} days left",
+        "title": f"<div class='day-allowance'>📉 {remaining} days left</div>",
         "start": day.strftime("%Y-%m-%d"),
         "end": day.strftime("%Y-%m-%d"),
-        "allDay": True,
         "display": "background",
-        "backgroundColor": "#e3f2fd"
+        "allDay": True,
+        "backgroundColor": "#ffffff"
     })
 
 # === Main Events (Trips) ===
@@ -87,7 +86,7 @@ for i, row in df.iterrows():
         continue
     events.append({
         "id": str(i),
-        "title": f"Trip {i+1}",
+        "title": f"{row['Departure'].date()} - {row['Return'].date()}",
         "start": row['Departure'].strftime("%Y-%m-%d"),
         "end": (row['Return'] + timedelta(days=1)).strftime("%Y-%m-%d"),
         "color": "#dc3545",
@@ -138,6 +137,8 @@ fullcalendar_html = f"""
   <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
   <style>
     #calendar {{ max-width: 1000px; margin: 20px auto; }}
+    .fc-daygrid-day-number {{ font-size: 1.5em; }}
+    .day-allowance {{ font-size: 0.8em; text-align: center; display: block; margin-top: 20px; color: #333; }}
     #popup {{
       display: none;
       position: fixed;
@@ -168,6 +169,11 @@ fullcalendar_html = f"""
           multiMonthYear: {{ type: 'multiMonth', duration: {{ months: 12 }}, buttonText: 'Yearly' }}
         }},
         events: {json.dumps(events + daily_events)},
+        eventContent: function(arg) {{
+          let container = document.createElement('div');
+          container.innerHTML = arg.event.title;
+          return {{ domNodes: [container] }};
+        }},
         eventClick: function(info) {{
           if (!info.event.extendedProps || !info.event.extendedProps.type) return;
           var details = `<b>` + info.event.title + `</b><br>` +
@@ -192,4 +198,4 @@ fullcalendar_html = f"""
 </body>
 </html>
 """
-components.html(fullcalendar_html, height=900, scrolling=True)
+components.html(fullcalendar_html, height=950, scrolling=True)
