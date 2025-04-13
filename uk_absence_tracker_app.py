@@ -35,8 +35,8 @@ elif use_google_sheet:
 sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
-df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True)
-df['Return'] = pd.to_datetime(df['Return'], dayfirst=True)
+df['Departure'] = pd.to_datetime(df['Departure'], format='%d/%m/%Y', errors='coerce')
+df['Return'] = pd.to_datetime(df['Return'], format='%d/%m/%Y', errors='coerce')
 st.sidebar.success("✅ Loaded from Google Sheet")
         except Exception as e:
             st.sidebar.error(f"❌ Failed to load: {e}")
