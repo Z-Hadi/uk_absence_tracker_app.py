@@ -165,6 +165,16 @@ uk_days_df["Info"] = "In the UK"
 full_calendar = pd.concat([calendar_df, uk_days_df])
 full_calendar = full_calendar.dropna(subset=["Date"]).sort_values("Date")
 
+# === Go To Specific Month & Year ===
+st.sidebar.subheader("📍 Jump to Month")
+month_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+selected_month = st.sidebar.selectbox("Month", month_names, index=datetime.today().month - 1)
+selected_month_number = month_names.index(selected_month) + 1
+selected_year = st.sidebar.number_input("Year", min_value=2020, max_value=2100, value=datetime.today().year, step=1)
+
+start_range = datetime(selected_year, selected_month_number, 1)
+end_range = start_range + pd.DateOffset(months=1) - timedelta(days=1)
+
 fig = px.timeline(
     full_calendar,
     x_start="Date",
@@ -173,13 +183,13 @@ fig = px.timeline(
     color="Trip",
     hover_data=["Info"]
 )
-
 fig.update_layout(
     showlegend=True,
     xaxis_title="",
     yaxis_title="",
     height=500,
     xaxis=dict(
+        range=[start_range, end_range],
         rangeselector=dict(
             buttons=list([
                 dict(count=1, label="1m", step="month", stepmode="backward"),
@@ -193,6 +203,5 @@ fig.update_layout(
         type="date"
     )
 )
-fig.update_layout(showlegend=True, xaxis_title="", yaxis_title="", height=400)
-fig.update_yaxes(visible=True)
+fig.update_yaxes(autorange="reversed")
 st.plotly_chart(fig, use_container_width=True)
