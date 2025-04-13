@@ -24,7 +24,7 @@ st.title("UK Absence Tracker")
 # === Load Trip Data ===
 st.sidebar.header("📤 Upload Your Trip Data")
 uploaded_file = st.sidebar.file_uploader("Upload CSV", type="csv")
-use_google_sheet = st.sidebar.checkbox("Load from Google Sheet", value=False)
+use_google_sheet = st.sidebar.checkbox("Load from Google Sheet", value=True)
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file, parse_dates=["Departure", "Return"], dayfirst=True)
