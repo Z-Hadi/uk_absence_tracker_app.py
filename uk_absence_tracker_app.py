@@ -142,10 +142,9 @@ st.pyplot(fig2)
 st.subheader("📆 Calendar of Absences")
 
 calendar_df = pd.DataFrame()
-trip_type = []
-trip_tooltip = []
-
 for i, row in df.iterrows():
+    if pd.isnull(row.Departure) or pd.isnull(row.Return):
+        continue
     color = "Planned" if not planned_df.empty and row.Departure == planned_df.iloc[0]['Departure'] else "Abroad"
     for d in pd.date_range(row.Departure, row.Return):
         calendar_df = pd.concat([calendar_df, pd.DataFrame({
@@ -164,6 +163,7 @@ uk_days_df["Trip"] = "UK"
 uk_days_df["Info"] = "In the UK"
 
 full_calendar = pd.concat([calendar_df, uk_days_df])
+full_calendar = full_calendar.dropna(subset=["Date"]).sort_values("Date")
 
 fig = px.timeline(
     full_calendar,
