@@ -19,7 +19,7 @@ GOOGLE_SHEET_NAME = "UK Absence Tracker"
 WORKSHEET_NAME = "Trips"
 
 st.set_page_config(page_title="UK Absence Tracker", layout="wide")
-st.title("🇬🇧 UK Absence Tracker (180-day Rule)")
+st.title("UK Absence Tracker")
 
 # === Load Trip Data ===
 st.sidebar.header("📤 Upload Your Trip Data")
@@ -60,8 +60,9 @@ for i, row in df.iterrows():
     balances.append(allowance)
 df['Allowance'] = balances
 
-# === Build Daily Allowance Tracker ===
-all_dates = pd.date_range(df['Departure'].min(), df['Return'].max())
+# === Build Daily Allowance Tracker (Past + Future) ===
+end_future = datetime.today() + timedelta(days=365)
+all_dates = pd.date_range(df['Departure'].min(), end_future)
 daily_events = []
 used_ranges = [pd.date_range(row.Departure + timedelta(days=1), row.Return - timedelta(days=1)) for row in df.itertuples()]
 flat_abroad = pd.concat([pd.Series(x) for x in used_ranges], ignore_index=True)
@@ -102,8 +103,10 @@ for i, row in df.iterrows():
 st.subheader("📋 Trip History")
 st.dataframe(df[['Departure', 'Return', 'Length', 'Allowance']].style.format({
     'Departure': lambda x: x.strftime('%Y-%m-%d'),
-    'Return': lambda x: x.strftime('%Y-%m-%d')
-}).set_properties(**{'text-align': 'center'}), use_container_width=True)
+    'Return': lambda x: x.strftime('%Y-%m-%d'),
+    'Length': '{:.0f}'.format,
+    'Allowance': '{:.0f}'.format
+}).set_table_styles([{ 'selector': 'td', 'props': [('text-align', 'center')] }, { 'selector': 'th', 'props': [('text-align', 'center')] }]), use_container_width=True)
 
 # === Restoration Dates ===
 restoration = []
@@ -120,8 +123,10 @@ restoration_df = pd.DataFrame(restoration).sort_values(by='Date').head(10)
 
 st.subheader("📈 Next 10 Balance Increase Dates")
 st.dataframe(restoration_df[['Date', 'Restored', 'New Balance']].style.format({
-    'Date': lambda x: x.strftime('%Y-%m-%d')
-}).set_properties(**{'text-align': 'center'}), use_container_width=True)
+    'Date': lambda x: x.strftime('%Y-%m-%d'),
+    'Restored': '{:.0f}'.format,
+    'New Balance': '{:.0f}'.format
+}).set_table_styles([{ 'selector': 'td', 'props': [('text-align', 'center')] }, { 'selector': 'th', 'props': [('text-align', 'center')] }]), use_container_width=True)
 
 # === FullCalendar Embed ===
 st.subheader("📅 Calendar with Daily Allowance")
@@ -157,10 +162,10 @@ fullcalendar_html = f"""
         headerToolbar: {{
           left: 'prev,next today',
           center: 'title',
-          right: 'dayGridYear,dayGridMonth,timeGridWeek,timeGridDay'
+          right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay'
         }},
         views: {{
-          dayGridYear: {{ type: 'dayGrid', duration: {{ months: 12 }} }}
+          multiMonthYear: {{ type: 'multiMonth', duration: {{ months: 12 }}, buttonText: 'Yearly' }}
         }},
         events: {json.dumps(events + daily_events)},
         eventClick: function(info) {{
@@ -187,4 +192,4 @@ fullcalendar_html = f"""
 </body>
 </html>
 """
-components.html(fullcalendar_html, height=850, scrolling=True)
+components.html(fullcalendar_html, height=900, scrolling=True)
