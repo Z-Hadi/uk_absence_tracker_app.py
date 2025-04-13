@@ -25,9 +25,9 @@ WORKSHEET_NAME = "Trips"
 
 # === Page Setup ===
 st.set_page_config(page_title="UK Absence Tracker", layout="wide")
-st.title("UK Absence Tracker (180-day Rule)")
+st.title("🇬🇧 UK Absence Tracker (180-day Rule)")
 
-# === Upload or Use Example Data ===
+# === Upload or Use Google Sheet ===
 st.sidebar.header("📤 Upload Your Trip Data")
 
 uploaded_file = st.sidebar.file_uploader("Upload CSV with Departure and Return dates", type="csv")
@@ -42,14 +42,25 @@ elif use_google_sheet:
             client = gspread.authorize(credentials)
             sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
             data = sheet.get_all_records()
+            st.sidebar.write("✅ Raw data from Google Sheet:", data)
+
             if not data:
                 raise ValueError("Sheet is empty or headers are missing.")
+
             df = pd.DataFrame(data)
+            st.sidebar.write("✅ DataFrame preview:", df.head())
+
             if "Departure" not in df.columns or "Return" not in df.columns:
-                raise ValueError("Sheet must contain 'Departure' and 'Return' columns.")
-            df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True)
-            df['Return'] = pd.to_datetime(df['Return'], dayfirst=True)
-            st.sidebar.success("✅ Loaded data from Google Sheet")
+                raise ValueError("Sheet must contain 'Departure' and 'Return' columns. Found columns: " + ", ".join(df.columns))
+
+            df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True, errors='coerce')
+            df['Return'] = pd.to_datetime(df['Return'], dayfirst=True, errors='coerce')
+
+            if df['Departure'].isnull().any() or df['Return'].isnull().any():
+                raise ValueError("Some dates couldn't be parsed. Check format in Google Sheet.")
+
+            st.sidebar.success("✅ Loaded and validated Google Sheet data")
+
         except Exception as e:
             st.sidebar.error(f"❌ Failed to load from Google Sheet: {e}")
             st.stop()
