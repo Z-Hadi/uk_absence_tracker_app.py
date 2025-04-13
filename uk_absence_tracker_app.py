@@ -54,15 +54,19 @@ elif use_google_sheet:
             client = gspread.authorize(credentials)
             sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
             data = sheet.get_all_records()
+            if not data:
+                raise ValueError("Sheet is empty or headers are missing.")
             df = pd.DataFrame(data)
+            if "Departure" not in df.columns or "Return" not in df.columns:
+                raise ValueError("Sheet must contain 'Departure' and 'Return' columns.")
             df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True)
             df['Return'] = pd.to_datetime(df['Return'], dayfirst=True)
-            st.sidebar.success("Loaded data from Google Sheet")
+            st.sidebar.success("✅ Loaded data from Google Sheet")
         except Exception as e:
-            st.sidebar.error(f"Failed to load from Google Sheet: {e}")
+            st.sidebar.error(f"❌ Failed to load from Google Sheet: {e}")
             df = pd.read_csv(StringIO(example_csv), parse_dates=["Departure", "Return"], dayfirst=True)
     else:
-        st.sidebar.error("No Google credentials found in Streamlit secrets")
+        st.sidebar.error("❌ No Google credentials found in Streamlit secrets")
         df = pd.read_csv(StringIO(example_csv), parse_dates=["Departure", "Return"], dayfirst=True)
 else:
     st.sidebar.info("Using example data. Upload a file to override.")
