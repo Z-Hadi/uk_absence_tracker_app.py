@@ -32,7 +32,10 @@ elif use_google_sheet:
     credentials = get_google_credentials()
     if credentials:
         try:
-            client = gspread.authorize(credentials)
+    client = gspread.authorize(credentials)
+    sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
+    raw_values = sheet.get_all_values()
+    st.sidebar.write("📄 Raw Sheet Preview:", raw_values[:10])
             sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
             raw_values = sheet.get_all_values()
 st.write("📄 Raw Sheet Preview:", raw_values[:10])
