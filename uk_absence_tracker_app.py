@@ -34,7 +34,9 @@ elif use_google_sheet:
         try:
             client = gspread.authorize(credentials)
             sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
-            data = sheet.get_all_records()
+            raw_values = sheet.get_all_values()
+st.write("📄 Raw Sheet Preview:", raw_values[:10])
+data = sheet.get_all_records()
             df = pd.DataFrame(data)
             df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True)
             df['Return'] = pd.to_datetime(df['Return'], dayfirst=True)
