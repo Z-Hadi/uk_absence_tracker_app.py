@@ -18,7 +18,6 @@ def get_google_credentials():
 GOOGLE_SHEET_NAME = "UK Absence Tracker"
 WORKSHEET_NAME = "Trips"
 
-# === Page Setup ===
 st.set_page_config(page_title="UK Absence Tracker", layout="wide")
 st.title("🇬🇧 UK Absence Tracker (180-day Rule)")
 
@@ -50,29 +49,61 @@ else:
     st.sidebar.warning("Please upload a CSV or connect to Google Sheets.")
     st.stop()
 
-# === What-if Simulation ===
-st.sidebar.subheader("🕵️ Add a Planned Trip")
-with st.sidebar.form("what_if_form"):
-    new_departure = st.date_input("Planned Departure")
-    new_return = st.date_input("Planned Return")
-    add_trip = st.form_submit_button("Add Trip")
-
-if add_trip and new_departure < new_return:
-    df = pd.concat([df, pd.DataFrame({"Departure": [new_departure], "Return": [new_return], "Planned": [True]})], ignore_index=True)
-else:
-    if "Planned" not in df:
-        df["Planned"] = False
-
-# === Calculations ===
+# === Process Data ===
 df = df.sort_values("Departure").reset_index(drop=True)
 df['Length'] = (df['Return'] - df['Departure']).dt.days - 1
-
 allowance = 180
 balances = []
+
 for i, row in df.iterrows():
     allowance -= row['Length']
     balances.append(allowance)
 df['Allowance'] = balances
+
+# === Build Daily Allowance Tracker ===
+all_dates = pd.date_range(df['Departure'].min(), df['Return'].max())
+daily_events = []
+used_ranges = [pd.date_range(row.Departure + timedelta(days=1), row.Return - timedelta(days=1)) for row in df.itertuples()]
+flat_abroad = pd.concat([pd.Series(x) for x in used_ranges], ignore_index=True)
+
+for day in all_dates:
+    in_abroad = (day in flat_abroad.values)
+    days_abroad = (flat_abroad <= day).sum()
+    remaining = max(180 - days_abroad, 0)
+    daily_events.append({
+        "title": f"📉 {remaining} days left",
+        "start": day.strftime("%Y-%m-%d"),
+        "end": day.strftime("%Y-%m-%d"),
+        "allDay": True,
+        "display": "background",
+        "backgroundColor": "#e3f2fd"
+    })
+
+# === Main Events (Trips) ===
+events = []
+for i, row in df.iterrows():
+    if pd.isnull(row['Departure']) or pd.isnull(row['Return']):
+        continue
+    events.append({
+        "id": str(i),
+        "title": f"Trip {i+1}",
+        "start": row['Departure'].strftime("%Y-%m-%d"),
+        "end": (row['Return'] + timedelta(days=1)).strftime("%Y-%m-%d"),
+        "color": "#dc3545",
+        "allDay": True,
+        "extendedProps": {
+            "length": f"{(row['Return'] - row['Departure']).days} days",
+            "type": "Abroad",
+            "allowance": row['Allowance']
+        }
+    })
+
+# === Show Tables ===
+st.subheader("📋 Trip History")
+st.dataframe(df[['Departure', 'Return', 'Length', 'Allowance']].style.format({
+    'Departure': lambda x: x.strftime('%Y-%m-%d'),
+    'Return': lambda x: x.strftime('%Y-%m-%d')
+}).set_properties(**{'text-align': 'center'}), use_container_width=True)
 
 # === Restoration Dates ===
 restoration = []
@@ -83,50 +114,17 @@ for row in df.itertuples():
     restoration.append({
         "Date": date,
         "Restored": row.Length,
-        "New Balance": current_balance,
-        "Reason": f"{row.Departure.date()} – {row.Return.date()}"
+        "New Balance": current_balance
     })
 restoration_df = pd.DataFrame(restoration).sort_values(by='Date').head(10)
 
-# === Show Tables First ===
-st.subheader("📋 Trip History")
-st.dataframe(df[['Departure', 'Return', 'Length', 'Planned', 'Allowance']])
-
 st.subheader("📈 Next 10 Balance Increase Dates")
-st.dataframe(restoration_df[['Date', 'Restored', 'New Balance', 'Reason']])
+st.dataframe(restoration_df[['Date', 'Restored', 'New Balance']].style.format({
+    'Date': lambda x: x.strftime('%Y-%m-%d')
+}).set_properties(**{'text-align': 'center'}), use_container_width=True)
 
-# === Calendar Filter ===
-st.sidebar.subheader("📊 Calendar Filters")
-show_real = st.sidebar.checkbox("Show Real Trips", value=True)
-show_planned = st.sidebar.checkbox("Show Planned Trips", value=True)
-
-# === Generate Calendar Events ===
-events = []
-for i, row in df.iterrows():
-    if pd.isnull(row['Departure']) or pd.isnull(row['Return']):
-        continue
-    planned = row.get("Planned", False)
-    if planned and not show_planned:
-        continue
-    if not planned and not show_real:
-        continue
-    title = f"Trip {i+1}: {row['Departure'].date()} to {row['Return'].date()}"
-    color = "#fd7e14" if planned else "#dc3545"
-    events.append({
-        "id": str(i),
-        "title": title,
-        "start": row['Departure'].strftime("%Y-%m-%d"),
-        "end": (row['Return'] + timedelta(days=1)).strftime("%Y-%m-%d"),
-        "color": color,
-        "allDay": True,
-        "extendedProps": {
-            "length": f"{(row['Return'] - row['Departure']).days} days",
-            "type": "Planned" if planned else "Abroad"
-        }
-    })
-
-# === FullCalendar with Popup, Edit/Delete, Animations ===
-st.subheader("📅 Interactive Calendar")
+# === FullCalendar Embed ===
+st.subheader("📅 Calendar with Daily Allowance")
 fullcalendar_html = f"""
 <!DOCTYPE html>
 <html>
@@ -146,11 +144,8 @@ fullcalendar_html = f"""
       border-radius: 8px;
       box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
       z-index: 1000;
-      animation: fadeIn 0.4s ease-in-out;
     }}
     #popup-close {{ cursor: pointer; float: right; font-weight: bold; color: red; }}
-    @keyframes fadeIn {{ from {{opacity: 0;}} to {{opacity: 1;}} }}
-    button {{ margin-top: 10px; margin-right: 5px; }}
   </style>
   <script>
     document.addEventListener('DOMContentLoaded', function() {{
@@ -167,13 +162,13 @@ fullcalendar_html = f"""
         views: {{
           dayGridYear: {{ type: 'dayGrid', duration: {{ months: 12 }} }}
         }},
-        events: {json.dumps(events)},
+        events: {json.dumps(events + daily_events)},
         eventClick: function(info) {{
+          if (!info.event.extendedProps || !info.event.extendedProps.type) return;
           var details = `<b>` + info.event.title + `</b><br>` +
                         `Type: ` + info.event.extendedProps.type + `<br>` +
-                        `Duration: ` + info.event.extendedProps.length + `<br><br>` +
-                        `<button onclick='alert("Edit feature coming soon!")'>✏️ Edit</button>` +
-                        `<button onclick='alert("Delete feature coming soon!")'>❌ Delete</button>`;
+                        `Duration: ` + info.event.extendedProps.length + `<br>` +
+                        `Allowance left: ` + info.event.extendedProps.allowance + ` days`;
           popupContent.innerHTML = details;
           popup.style.display = 'block';
         }}
@@ -192,4 +187,4 @@ fullcalendar_html = f"""
 </body>
 </html>
 """
-components.html(fullcalendar_html, height=800, scrolling=True)
+components.html(fullcalendar_html, height=850, scrolling=True)
