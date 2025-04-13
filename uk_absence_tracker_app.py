@@ -126,3 +126,47 @@ st.dataframe(restoration_df[['Date', 'Restored', 'New Balance']].style.format({
     'Restored': '{:.0f}'.format,
     'New Balance': '{:.0f}'.format
 }).set_table_styles([{ 'selector': 'td', 'props': [('text-align', 'center')] }, { 'selector': 'th', 'props': [('text-align', 'center')] }]), use_container_width=True)
+
+# === FullCalendar Embed ===
+st.subheader("📅 Calendar with Daily Allowance")
+fullcalendar_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+  <style>
+    #calendar {{ max-width: 1000px; margin: 20px auto; }}
+    .fc-daygrid-day-number {{ font-size: 1.5em; }}
+    .day-allowance {{ font-size: 0.8em; text-align: center; display: block; margin-top: 20px; color: #333; }}
+  </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {{
+      var calendarEl = document.getElementById('calendar');
+      var calendar = new FullCalendar.Calendar(calendarEl, {{
+        initialView: 'dayGridMonth',
+        headerToolbar: {{
+          left: 'prev,next today',
+          center: 'title',
+          right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay'
+        }},
+        views: {{
+          multiMonthYear: {{ type: 'multiMonth', duration: {{ months: 12 }}, buttonText: 'Yearly' }}
+        }},
+        events: {json.dumps(events + daily_events)},
+        eventContent: function(arg) {{
+          let container = document.createElement('div');
+          container.innerHTML = arg.event.title;
+          return {{ domNodes: [container] }};
+        }}
+      }});
+      calendar.render();
+    }});
+  </script>
+</head>
+<body>
+  <div id='calendar'></div>
+</body>
+</html>
+"""
+components.html(fullcalendar_html, height=950, scrolling=True)
