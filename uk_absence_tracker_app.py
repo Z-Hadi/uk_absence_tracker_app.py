@@ -171,9 +171,14 @@ month_names = ["January", "February", "March", "April", "May", "June", "July", "
 selected_month = st.sidebar.selectbox("Month", month_names, index=datetime.today().month - 1)
 selected_month_number = month_names.index(selected_month) + 1
 selected_year = st.sidebar.number_input("Year", min_value=2020, max_value=2100, value=datetime.today().year, step=1)
+apply_zoom = st.sidebar.button("Go to Month")
 
 start_range = datetime(selected_year, selected_month_number, 1)
 end_range = start_range + pd.DateOffset(months=1) - timedelta(days=1)
+month_data = full_calendar[(full_calendar['Date'] >= start_range) & (full_calendar['Date'] <= end_range)]
+
+if month_data.empty:
+    st.warning("⚠️ No trips found in this selected month.")
 
 fig = px.timeline(
     full_calendar,
@@ -189,7 +194,7 @@ fig.update_layout(
     yaxis_title="",
     height=500,
     xaxis=dict(
-        range=[start_range, end_range],
+        range=[start_range, end_range] if apply_zoom else None,
         rangeselector=dict(
             buttons=list([
                 dict(count=1, label="1m", step="month", stepmode="backward"),
