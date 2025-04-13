@@ -141,7 +141,7 @@ st.pyplot(fig2)
 st.subheader("📆 Calendar of Absences")
 days_outside = []
 for row in df.itertuples():
-    days_outside.extend(pd.date_range(row.Departure + timedelta(days=1), row.Return - timedelta(days=1)))
+    days_outside.extend(pd.date_range(row.Departure, row.Return))
 days_df = pd.DataFrame(days_outside, columns=["Date"])
 days_df["Status"] = "Abroad"
 
