@@ -31,17 +31,13 @@ if uploaded_file:
 elif use_google_sheet:
     credentials = get_google_credentials()
     if credentials:
-        try:
-    client = gspread.authorize(credentials)
-    sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
-    raw_values = sheet.get_all_values()
-    st.sidebar.write("📄 Raw Sheet Preview:", raw_values[:10])
-
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data)
-    df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True)
-    df['Return'] = pd.to_datetime(df['Return'], dayfirst=True)
-    st.sidebar.success("✅ Loaded from Google Sheet")
+        client = gspread.authorize(credentials)
+sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
+data = sheet.get_all_records()
+df = pd.DataFrame(data)
+df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True)
+df['Return'] = pd.to_datetime(df['Return'], dayfirst=True)
+st.sidebar.success("✅ Loaded from Google Sheet")
         except Exception as e:
             st.sidebar.error(f"❌ Failed to load: {e}")
             st.stop()
