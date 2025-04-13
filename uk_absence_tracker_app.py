@@ -31,13 +31,14 @@ if uploaded_file:
 elif use_google_sheet:
     credentials = get_google_credentials()
     if credentials:
-        client = gspread.authorize(credentials)
-sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
-data = sheet.get_all_records()
-df = pd.DataFrame(data)
-df['Departure'] = pd.to_datetime(df['Departure'], format='%d/%m/%Y', errors='coerce')
-df['Return'] = pd.to_datetime(df['Return'], format='%d/%m/%Y', errors='coerce')
-st.sidebar.success("✅ Loaded from Google Sheet")
+        try:
+            client = gspread.authorize(credentials)
+            sheet = client.open(GOOGLE_SHEET_NAME).worksheet(WORKSHEET_NAME)
+            data = sheet.get_all_records()
+            df = pd.DataFrame(data)
+            df['Departure'] = pd.to_datetime(df['Departure'], dayfirst=True)
+            df['Return'] = pd.to_datetime(df['Return'], dayfirst=True)
+            st.sidebar.success("✅ Loaded from Google Sheet")
         except Exception as e:
             st.sidebar.error(f"❌ Failed to load: {e}")
             st.stop()
@@ -70,12 +71,12 @@ for day in all_dates:
     days_abroad = (flat_abroad <= day).sum()
     remaining = max(180 - days_abroad, 0)
     daily_events.append({
-        "title": f"<div class='day-allowance'>📉 {remaining} days left</div>",
+        "title": f"📉 {remaining} days left",
         "start": day.strftime("%Y-%m-%d"),
         "end": day.strftime("%Y-%m-%d"),
-        "display": "background",
         "allDay": True,
-        "backgroundColor": "#ffffff"
+        "display": "background",
+        "backgroundColor": "#e3f2fd"
     })
 
 # === Main Events (Trips) ===
@@ -125,76 +126,3 @@ st.dataframe(restoration_df[['Date', 'Restored', 'New Balance']].style.format({
     'Restored': '{:.0f}'.format,
     'New Balance': '{:.0f}'.format
 }).set_table_styles([{ 'selector': 'td', 'props': [('text-align', 'center')] }, { 'selector': 'th', 'props': [('text-align', 'center')] }]), use_container_width=True)
-
-# === FullCalendar Embed ===
-st.subheader("📅 Calendar with Daily Allowance")
-fullcalendar_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
-  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
-  <style>
-    #calendar {{ max-width: 1000px; margin: 20px auto; }}
-    .fc-daygrid-day-number {{ font-size: 1.5em; }}
-    .day-allowance {{ font-size: 0.8em; text-align: center; display: block; margin-top: 20px; color: #333; }}
-    #popup {{
-      display: none;
-      position: fixed;
-      top: 20%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-      z-index: 1000;
-    }}
-    #popup-close {{ cursor: pointer; float: right; font-weight: bold; color: red; }}
-  </style>
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {{
-      var calendarEl = document.getElementById('calendar');
-      var popup = document.getElementById('popup');
-      var popupContent = document.getElementById('popup-content');
-      var calendar = new FullCalendar.Calendar(calendarEl, {{
-        initialView: 'dayGridMonth',
-        headerToolbar: {{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay'
-        }},
-        views: {{
-          multiMonthYear: {{ type: 'multiMonth', duration: {{ months: 12 }}, buttonText: 'Yearly' }}
-        }},
-        events: {json.dumps(events + daily_events)},
-        eventContent: function(arg) {{
-          let container = document.createElement('div');
-          container.innerHTML = arg.event.title;
-          return {{ domNodes: [container] }};
-        }},
-        eventClick: function(info) {{
-          if (!info.event.extendedProps || !info.event.extendedProps.type) return;
-          var details = `<b>` + info.event.title + `</b><br>` +
-                        `Type: ` + info.event.extendedProps.type + `<br>` +
-                        `Duration: ` + info.event.extendedProps.length + `<br>` +
-                        `Allowance left: ` + info.event.extendedProps.allowance + ` days`;
-          popupContent.innerHTML = details;
-          popup.style.display = 'block';
-        }}
-      }});
-      calendar.render();
-      document.getElementById('popup-close').onclick = function() {{ popup.style.display = 'none'; }};
-    }});
-  </script>
-</head>
-<body>
-  <div id='calendar'></div>
-  <div id='popup'>
-    <span id='popup-close'>✖</span>
-    <div id='popup-content'></div>
-  </div>
-</body>
-</html>
-"""
-components.html(fullcalendar_html, height=950, scrolling=True)
