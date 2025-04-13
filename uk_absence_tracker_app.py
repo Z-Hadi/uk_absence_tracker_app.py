@@ -180,6 +180,12 @@ month_data = full_calendar[(full_calendar['Date'] >= start_range) & (full_calend
 if month_data.empty:
     st.warning("⚠️ No trips found in this selected month.")
 
+# DEBUGGING CALENDAR CONTENT
+st.write("📊 Full Calendar Sample", full_calendar.head(10))
+st.write("📅 Min date:", full_calendar["Date"].min())
+st.write("📅 Max date:", full_calendar["Date"].max())
+st.write("✅ Total Calendar Rows:", len(full_calendar))
+
 fig = px.timeline(
     full_calendar,
     x_start="Date",
@@ -194,7 +200,8 @@ fig.update_layout(
     yaxis_title="",
     height=500,
     xaxis=dict(
-        range=[start_range, end_range] if apply_zoom else None,
+        # TEMP: Disabled range filtering to ensure calendar displays
+        # range=[start_range, end_range] if apply_zoom else None,
         rangeselector=dict(
             buttons=list([
                 dict(count=1, label="1m", step="month", stepmode="backward"),
