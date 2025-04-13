@@ -5,6 +5,7 @@ import gspread
 from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 import streamlit.components.v1 as components
+import time
 
 # === Google Sheets Credentials ===
 def get_google_credentials():
@@ -22,6 +23,7 @@ st.set_page_config(page_title="UK Absence Tracker", layout="wide")
 st.title("UK Absence Tracker")
 
 # === Load Trip Data ===
+refresh = st.sidebar.checkbox("🔄 Auto-refresh every 60 seconds")
 st.sidebar.header("📤 Upload Your Trip Data")
 uploaded_file = st.sidebar.file_uploader("Upload CSV", type="csv")
 use_google_sheet = st.sidebar.checkbox("Load from Google Sheet", value=True)
@@ -76,7 +78,7 @@ for day in all_dates:
         "end": day.strftime("%Y-%m-%d"),
         "allDay": True,
         "display": "background",
-        "backgroundColor": "#e3f2fd"
+        "backgroundColor": "#f0f9ff"
     })
 
 # === Main Events (Trips) ===
@@ -98,14 +100,29 @@ for i, row in df.iterrows():
         }
     })
 
+# === Styled Table Helper ===
+def styled_table(df_subset):
+    return df_subset.style \
+        .format({
+            'Departure': lambda x: x.strftime('%Y-%m-%d'),
+            'Return': lambda x: x.strftime('%Y-%m-%d'),
+            'Length': '{:.0f}'.format,
+            'Allowance': '{:.0f}'.format,
+            'Restored': '{:.0f}'.format,
+            'New Balance': '{:.0f}'.format,
+            'Date': lambda x: x.strftime('%Y-%m-%d') if isinstance(x, pd.Timestamp) else x
+        }) \
+        .set_table_styles([
+            {'selector': 'thead th', 'props': [('background-color', '#0f4c81'), ('color', 'white'), ('text-align', 'center')]},
+            {'selector': 'tbody td', 'props': [('text-align', 'center')]},
+            {'selector': 'tr:nth-child(even)', 'props': [('background-color', '#f2f2f2')]},
+            {'selector': 'tr:nth-child(odd)', 'props': [('background-color', '#ffffff')]}
+        ]) \
+        .set_properties(**{'border': '1px solid #ccc', 'border-radius': '6px', 'padding': '6px'})
+
 # === Show Tables ===
 st.subheader("📋 Trip History")
-st.dataframe(df[['Departure', 'Return', 'Length', 'Allowance']].style.format({
-    'Departure': lambda x: x.strftime('%Y-%m-%d'),
-    'Return': lambda x: x.strftime('%Y-%m-%d'),
-    'Length': '{:.0f}'.format,
-    'Allowance': '{:.0f}'.format
-}).set_table_styles([{ 'selector': 'td', 'props': [('text-align', 'center')] }, { 'selector': 'th', 'props': [('text-align', 'center')] }]), use_container_width=True)
+st.dataframe(styled_table(df[['Departure', 'Return', 'Length', 'Allowance']]), use_container_width=True)
 
 # === Restoration Dates ===
 restoration = []
@@ -121,11 +138,7 @@ for row in df.itertuples():
 restoration_df = pd.DataFrame(restoration).sort_values(by='Date').head(10)
 
 st.subheader("📈 Next 10 Balance Increase Dates")
-st.dataframe(restoration_df[['Date', 'Restored', 'New Balance']].style.format({
-    'Date': lambda x: x.strftime('%Y-%m-%d'),
-    'Restored': '{:.0f}'.format,
-    'New Balance': '{:.0f}'.format
-}).set_table_styles([{ 'selector': 'td', 'props': [('text-align', 'center')] }, { 'selector': 'th', 'props': [('text-align', 'center')] }]), use_container_width=True)
+st.dataframe(styled_table(restoration_df[['Date', 'Restored', 'New Balance']]), use_container_width=True)
 
 # === FullCalendar Embed ===
 st.subheader("📅 Calendar with Daily Allowance")
@@ -139,6 +152,7 @@ fullcalendar_html = f"""
     #calendar {{ max-width: 1000px; margin: 20px auto; }}
     .fc-daygrid-day-number {{ font-size: 1.5em; }}
     .day-allowance {{ font-size: 0.8em; text-align: center; display: block; margin-top: 20px; color: #333; }}
+    .fc-event-title {{ font-weight: bold; }}
   </style>
   <script>
     document.addEventListener('DOMContentLoaded', function() {{
@@ -158,6 +172,28 @@ fullcalendar_html = f"""
           let container = document.createElement('div');
           container.innerHTML = arg.event.title;
           return {{ domNodes: [container] }};
+        }},
+        eventMouseEnter: function(info) {{
+          if (info.event.extendedProps) {{
+            const tooltip = document.createElement('div');
+            tooltip.id = 'tooltip';
+            tooltip.style.position = 'absolute';
+            tooltip.style.background = '#333';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '6px';
+            tooltip.style.borderRadius = '4px';
+            tooltip.style.zIndex = 10001;
+            tooltip.innerHTML = `<b>${{info.event.title}}</b><br>Type: ${{info.event.extendedProps.type}}<br>Duration: ${{info.event.extendedProps.length}}<br>Allowance: ${{info.event.extendedProps.allowance}} days`;
+            document.body.appendChild(tooltip);
+            info.el.onmousemove = function(e) {{
+              tooltip.style.left = e.pageX + 10 + 'px';
+              tooltip.style.top = e.pageY + 10 + 'px';
+            }};
+          }}
+        }},
+        eventMouseLeave: function(info) {{
+          const tooltip = document.getElementById('tooltip');
+          if (tooltip) tooltip.remove();
         }}
       }});
       calendar.render();
@@ -170,3 +206,8 @@ fullcalendar_html = f"""
 </html>
 """
 components.html(fullcalendar_html, height=950, scrolling=True)
+
+# === Auto-Refresh ===
+if refresh:
+    time.sleep(60)
+    st.experimental_rerun()
