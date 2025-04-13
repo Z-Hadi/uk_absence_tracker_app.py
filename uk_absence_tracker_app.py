@@ -78,9 +78,10 @@ with st.sidebar.form("what_if_form"):
     new_return = st.date_input("Planned Return")
     add_trip = st.form_submit_button("Add Trip")
 
+planned_df = pd.DataFrame()
 if add_trip and new_departure < new_return:
-    new_row = pd.DataFrame({"Departure": [new_departure], "Return": [new_return]})
-    df = pd.concat([df, new_row], ignore_index=True)
+    planned_df = pd.DataFrame({"Departure": [new_departure], "Return": [new_return]})
+    df = pd.concat([df, planned_df], ignore_index=True)
 
 # === Calculations ===
 df = df.sort_values(by='Departure').reset_index(drop=True)
@@ -139,13 +140,39 @@ st.pyplot(fig2)
 
 # === Calendar Visualization ===
 st.subheader("📆 Calendar of Absences")
-days_outside = []
-for row in df.itertuples():
-    days_outside.extend(pd.date_range(row.Departure, row.Return))
-days_df = pd.DataFrame(days_outside, columns=["Date"])
-days_df["Status"] = "Abroad"
 
-fig = px.timeline(days_df, x_start="Date", x_end="Date", y="Status", color="Status")
-fig.update_layout(showlegend=False, xaxis_title="", yaxis_title="")
-fig.update_yaxes(visible=False)
+calendar_df = pd.DataFrame()
+trip_type = []
+trip_tooltip = []
+
+for i, row in df.iterrows():
+    color = "Planned" if not planned_df.empty and row.Departure == planned_df.iloc[0]['Departure'] else "Abroad"
+    for d in pd.date_range(row.Departure, row.Return):
+        calendar_df = pd.concat([calendar_df, pd.DataFrame({
+            "Date": [d],
+            "Trip": [color],
+            "Info": [f"Trip {i+1}: {row.Departure.date()} to {row.Return.date()}\nLength: {row.Length} days\nAllowance left: {row.Allowance}"]
+        })])
+
+# Fill green UK days for current year
+start_of_year = datetime(datetime.today().year, 1, 1)
+end_of_year = datetime(datetime.today().year, 12, 31)
+uk_days = pd.date_range(start_of_year, end_of_year)
+uk_days_df = pd.DataFrame({"Date": uk_days})
+uk_days_df = uk_days_df[~uk_days_df["Date"].isin(calendar_df["Date"])]
+uk_days_df["Trip"] = "UK"
+uk_days_df["Info"] = "In the UK"
+
+full_calendar = pd.concat([calendar_df, uk_days_df])
+
+fig = px.timeline(
+    full_calendar,
+    x_start="Date",
+    x_end="Date",
+    y="Trip",
+    color="Trip",
+    hover_data=["Info"]
+)
+fig.update_layout(showlegend=True, xaxis_title="", yaxis_title="", height=400)
+fig.update_yaxes(visible=True)
 st.plotly_chart(fig, use_container_width=True)
